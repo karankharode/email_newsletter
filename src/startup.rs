@@ -5,6 +5,7 @@ use actix_web::middleware::Logger;
 use std::net::TcpListener;
 use crate::routes::health_checker::health_checker;
 use crate::routes::subscriptions::subscribe;
+use tracing_actix_web::TracingLogger;
 
 // async fn greet(req: HttpRequest) -> impl Responder {
 //     let name: &str = req.match_info().get("name").unwrap_or("World");
@@ -16,7 +17,7 @@ pub fn run(listener: TcpListener, db_pool: PgPool ) -> Result<Server, std::io::E
     let connection = web::Data::new(db_pool);
     let server = HttpServer::new( move || {
         App::new() 
-        .wrap(Logger::default())
+        .wrap(TracingLogger::default())
         .route("/", web::get().to(health_checker))
         // .route("/{name}", web::get().to(greet))
         .route("/health_checker", web::get().to(health_checker))

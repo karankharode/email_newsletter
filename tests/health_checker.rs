@@ -1,10 +1,27 @@
 //! tests/health_check.rs
 
 use std::net::TcpListener;
+use secrecy::ExposeSecret;
 
-use email_newsletter::configuration::{get_configuration, DatabaseSettings};
+use email_newsletter::{
+    configuration::{get_configuration, DatabaseSettings},
+    telemetry::{get_subscriber, init_subscriber},
+};
+use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
+
+static TRACING: Lazy<()> = Lazy::new(|| {
+    let default_filter_level = "info".to_string();
+    let subscriber_name = "test".to_string();
+    if std::env::var("TEST_LOG").is_ok() {
+        let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::stdout);
+        init_subscriber(subscriber);
+    } else {
+        let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::sink);
+        init_subscriber(subscriber);
+    }
+});
 
 pub struct TestApp {
     pub address: String,
@@ -34,11 +51,6 @@ async fn subscribe_returns_a_200_for_valid_data() {
     // arrange
     let app = spawn_app().await;
     let app_address = &app.address;
-    let configuration = get_configuration().expect("Failed to get configuration");
-    let connection_string = configuration.database.connection_string();
-    let mut connection_pool = PgPool::connect(&connection_string)
-        .await
-        .expect("Failed to connect to database");
     let client = reqwest::Client::new();
 
     // Act
@@ -98,10 +110,11 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
 }
 
 async fn spawn_app() -> TestApp {
+    Lazy::force(&TRACING);
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{}", port);
-
     let mut configuration = get_configuration().expect("Failed to get configuration");
     configuration.database.database_name = Uuid::new_v4().to_string();
 
@@ -117,25 +130,24 @@ async fn spawn_app() -> TestApp {
     }
 }
 
-pub async fn configure_databse(config: &DatabaseSettings)-> PgPool{
+pub async fn configure_databse(config: &DatabaseSettings) -> PgPool {
     // Create Database
-    let mut connection =  
-    PgConnection::connect(&config.connection_string_without_db())
-    .await
-    .expect("Failed to connect to postgres");
+    let mut connection = PgConnection::connect(&config.connection_string_without_db().expose_secret())
+        .await
+        .expect("Failed to connect to postgres");
 
-    connection.execute(format!(r#"CREATE DATABASE "{}";"#, &config.database_name).as_str())
-    .await
-    .expect("Failed to create database.");
+    connection
+        .execute(format!(r#"CREATE DATABASE "{}";"#, &config.database_name).as_str())
+        .await
+        .expect("Failed to create database.");
 
     // Migrate
-    let connection_pool =  PgPool::connect(&config.connection_string())
+    let connection_pool = PgPool::connect(&config.connection_string().expose_secret())
         .await
         .expect("Failed to connect to database");
     sqlx::migrate!("./migrations")
-    .run(&connection_pool)
-    .await
-    .expect("Failed to migrate the database");
-connection_pool
-
+        .run(&connection_pool)
+        .await
+        .expect("Failed to migrate the database");
+    connection_pool
 }
