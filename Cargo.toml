@@ -2,5 +2,38 @@
 name = "email_newsletter"
 version = "0.1.0"
 edition = "2021"
+authors = ["Karan Kharode <karankharode.kk@gmail.com>"]
+
 
 [dependencies]
+actix-web = "4.5.0"
+tokio = {version = "1", features = ["macros", "rt-multi-thread"]}
+serde = { version = "1.0", features = ["derive"]}
+config = "0.14.0"
+uuid = {version = "1.6.0", features = ["v4"]}
+chrono = "0.4.22"
+env_logger = "0.11.5"
+
+# Using table-like toml syntax to avoid a super-long line!
+[dependencies.sqlx]
+version = "0.8.2"
+default-features = true
+features = [
+    "macros",
+    "postgres",
+    # "runtime-actix-rustls",
+    "runtime-tokio", "tls-native-tls",
+    "migrate",
+    "uuid",
+    "chrono",
+]
+
+[dev-dependencies]
+reqwest = "0.12.5"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "email_newsletter"
+path = "src/main.rs"
