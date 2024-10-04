@@ -21,7 +21,7 @@ secrecy =  { version = "0.10.2", features = ["serde"] }
 tracing-actix-web = "0.7.0"
 # Using table-like toml syntax to avoid a super-long line!
 [dependencies.sqlx]
-version = "0.8.0"
+version = "0.8.2"
 default-features = true
 features = [
     "macros",
